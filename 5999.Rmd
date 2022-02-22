@@ -1,0 +1,185 @@
+---
+title: '5999'
+author: "Leah Wu"
+date: "2/2/2022"
+output: html_document
+---
+
+
+data for locoation BMT 2001 whole year 
+```{r}
+library(tidyverse)
+```
+
+
+changing index 1: MLT (magnetic local time)
+
+changing index 2: SZA
+
+changing index 3: dbn_nez
+
+changing index 4: dbe_nez
+
+changing index 5: dbz_nez
+
+changing index 6: dbn_geo
+
+changing index 7: dbe_geo
+
+changing index 8: dbz_geo
+
+
+```{r}
+# data is CLK station 2001 whole year 
+df <- read.csv("/Users/nodoublele/Desktop/STSCI 5999/20220218-21-47-supermag.csv", header = T)
+# keep only the rows that do not contain NAs
+df <- df[rowSums(is.na(df))==0,]
+```
+
+
+```{r}
+# analyze dbe_geo
+dat_dbe_geo <- df[,c('dbe_geo')]
+dat_dbe_geo  <- as.data.frame(dat_dbe_geo) 
+# the minute that highest dbe_geo value occurs
+max_minute <- which.max(dat_dbe_geo$dat_dbe_geo)
+max_minute
+# the highest value
+max_val <- dat_dbe_geo[max_value, ]
+max_val
+# the day that the highest dbe_geo value occurs
+max_day <- max_minute/1440
+# the day is the 90th day of the year 2001
+max_day
+```
+
+```{r}
+# create time series data per day for the whole year of 2001
+dat1 <- ts(dat_dbe_geo,frequency = 1440, start = c(1, 1))
+# based on the plot, the highest dbe_geo value indeed occurs on the 90th day of 2001
+plot.ts(dat1)
+```
+
+
+
+```{r}
+# same procedure for dbe_nez
+dat_dbe_nez <- df[,c('dbe_nez')]
+dat_dbe_nez  <- as.data.frame(dat_dbe_nez)
+dat2 <- ts(dat_dbe_nez,frequency = 1440, start = c(1, 1))
+plot.ts(dat2)
+```
+
+
+```{r}
+# same procedure for dbn_geo
+dat_dbn_geo <- df[,c('dbn_geo')]
+dat_dbn_geo  <- as.data.frame(dat_dbn_geo)
+dat3 <- ts(dat_dbn_geo,frequency = 1440, start = c(1, 1))
+plot.ts(dat3)
+```
+
+
+```{r}
+# same procedure for dbn_nez
+dat_dbn_nez <- df[,c('dbn_nez')]
+dat_dbn_nez  <- as.data.frame(dat_dbn_nez)
+dat4 <- ts(dat_dbn_nez,frequency = 1440, start = c(1, 1))
+plot.ts(dat4)
+```
+
+
+
+```{r}
+# same procedure for dbz_geo
+dat_dbz_geo <- df[,c('dbz_geo')]
+dat_dbz_geo  <- as.data.frame(dat_dbz_geo)
+dat5 <- ts(dat_dbz_geo,frequency = 1440, start = c(1, 1))
+plot.ts(dat5)
+```
+
+
+
+```{r}
+# same procedure for dbz_nez
+dat_dbz_nez<- df[,c('dbz_nez')]
+dat_dbz_nez  <- as.data.frame(dat_dbz_nez)
+dat6 <- ts(dat_dbz_nez,frequency = 1440, start = c(1, 1))
+plot.ts(dat6)
+```
+
+```{r}
+# plot the six variables together
+par(mfrow=c(2,3))
+plot.ts(dat1)
+plot.ts(dat2)
+plot.ts(dat3)
+plot.ts(dat4)
+plot.ts(dat5)
+plot.ts(dat6)
+```
+
+
+Time series = Seasonal + Trend + Random 
+```{r}
+decomp1 <- decompose(dat1)
+plot(decomp1)
+```
+
+
+
+
+
+```{r}
+decomp2 <- decompose(dat2)
+plot(decomp2)
+```
+
+
+
+```{r}
+decomp3 <- decompose(dat3)
+plot(decomp3)
+```
+
+
+
+```{r}
+decomp4 <- decompose(dat4)
+plot(decomp4)
+```
+
+
+
+```{r}
+decomp5 <- decompose(dat5)
+plot(decomp5)
+```
+
+
+
+```{r}
+decomp6 <- decompose(dat6)
+plot(decomp6)
+```
+
+
+```{r}
+par(mfrow = c(2, 3))
+p1 <- plot(decomp1)
+p2 <- plot(decomp2)
+p3 <- plot(decomp3)
+p4 <- plot(decomp4)
+p5 <- plot(decomp5)
+p6 <- plot(decomp6)
+
+```
+
+
+
+
+
+
+
+
+
