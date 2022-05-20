@@ -1,0 +1,384 @@
+---
+title: "Project_Final"
+author: "Joo Kim"
+date: '2022-05-19'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+library(gridExtra)
+library(reshape2)
+library(tseries)
+library(DescTools)
+library("TTR")
+library(Kendall)
+library(patchwork)
+library(ggpubr)
+library(corrplot)
+library(tidyverse)
+```
+
+
+# Data Dictionary
+
+| Field Name | Data Type | Description                                                    | Example             |
+|:------------:|:-----------:|:----------------------------------------------------------------|:---------------------|
+| Date_UTC   | character | Date (Universal Time Correlated)                               | 2000-01-01T00:00:00 |
+| dbn_nez    | float     | Magnetic field north component, NEZ coordinates [nT]           | -51.6               |
+| dbe_nez    | float     | Magnetic field east component, NEZ coordinates [nT]            | -5.7                |
+| dbz_nez    | float     | Magnetic field vertical component, NEZ coordinates [nT]        | 15.0                |
+| dbn_geo    | float     | Magnetic field north component, geographic coordinates [nT]    | -51.8               |
+| dbe_geo    | float     | Magnetic field east component, geographic coordinates [nT]     | 3.5                 |
+| dbz_geo    | float     | Magnetic field vertical component, geographic coordinates [nT] | 15.0                |
+| Extent     | double    | Extent of Record [seconds]                                     | 60                  |
+| IAGA       | character | Station Identifier                                             | FRD                 |
+| GEOLON     | float     | Geographic Longitude [degrees]                                 | 282.63              |
+| GEOLAT     | float     | Geographic Latitude [degrees]                                  | 38.2                |
+| MAGON      | float     | AACGM Longitude [degrees]                                      | -2.13               |
+| MAGLAT     | float     | AACGM Latitude [degrees]                                       | 49.08               |
+| MLT        | float     | AACGM Magnetic Local Time [h]                                  | 18.70               |
+| MCOLAT     | float     | AACGM Colatitude [degrees]                                     | 40.92               |
+| IGRF_DECL  | float     | Magnetic Declination [degrees]                                 | -10.18              |
+| SZA        | float     | Solar Zenith Angle [degrees]                                   | 113.02              |
+
+- NEZ: North, East, Vertical directions
+- AACGM: Altitude adjusted corrected geomagnetic
+- nT: nano tesla (a unit of magnetic flux)
+
+
+# Visualizations
+
+## Daily Data
+
+```{r}
+df = read.table("FRD2001.csv", sep = ',', header = T)
+df_sample = df[(1:nrow(df) - 1) %% 24 == 0 ,]
+df_sample$Date = ymd(substr(df_sample$Date_UTC, 1, 10))
+
+df_sample = gather(df_sample, "Variables", "value",  c(2:7))
+```
+
+```{r}
+p <- ggplot(aes(x = Date, y = value, colour = Variables), data = df_sample) +
+  geom_line() + facet_grid(rows = vars(Variables), scales = "free") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("FRD 2001 Daily Data") +
+  theme_bw() +
+  theme(plot.title = element_text(face="bold", size=15), text = element_text(size = 12),
+        legend.background = element_rect(fill = "white", size = 6, colour = "white"),
+        strip.text.y = element_blank(),
+        legend.text=element_text(size=12)) +
+  scale_color_brewer(name="Variables",
+                     labels=c("east_geo","east_nez","north_geo","north_nez","vertical_geo","vertical_nez"),
+                     palette="Paired")
+
+p
+```
+## Correlation matrix
+
+```{r}
+clk <- read.csv("clk2001_samples.csv")
+frd <- read.csv("FRD2001.csv")
+```
+
+```{r}
+# keep only relevant variables
+clk <- clk[,c("Date_UTC","dbn_nez","dbn_geo","dbe_nez","dbe_geo","dbz_nez","dbz_geo")]
+frd <- frd[,c("Date_UTC","dbn_nez","dbn_geo","dbe_nez","dbe_geo","dbz_nez","dbz_geo")]
+```
+
+```{r}
+# number of rows of the data
+print(nrow(clk))
+print(nrow(frd))
+```
+
+```{r}
+# hourly data
+clk2 = clk[(1:nrow(clk)-1) %% 60 == 0 ,]
+frd2 = frd
+```
+
+```{r}
+# check the n of rows
+print(nrow(clk2))
+print(nrow(frd2))
+```
+
+
+
+```{r}
+# getting correlation matrix
+clk_cor = cor(clk2[,2:7], use = "complete.obs", method = c("kendall"))
+frd_cor = cor(frd2[,2:7], use = "complete.obs", method = "kendall")
+```
+
+```{r}
+corrplot(clk_cor, type = "upper", order = "original",
+         tl.col = "black", tl.srt = 45, title = "Correlation Plot of CLK Station",
+         mar=c(0,0,2,0))
+```
+
+```{r}
+corrplot(frd_cor, type = "upper", order = "original", 
+         tl.col = "black", tl.srt = 45, title = "Correlation Plot of FRD Station",
+         mar=c(0,0,2,0))
+```
+
+## Density plots
+```{r}
+frd2001 <- read.table("frd2001_samples.csv", sep = ',', header = T)
+mfrd2001 <- melt(frd2001[,c("Date_UTC","dbn_nez","dbe_nez","dbz_nez")], id = "Date_UTC")
+mfrd2001_g <- melt(frd2001[,c("Date_UTC","dbn_geo","dbe_geo","dbz_geo")], id = "Date_UTC")
+```
+
+
+```{r}
+# NEZ coordinates
+ggplot(mfrd2001, aes(x=value, color=variable, fill=variable)) + 
+  geom_density(alpha=0.05) +
+  facet_grid(rows = vars(variable)) +
+  ggtitle("Density Plot for Magnetic Field (NEZ coordinates) [FRD 2001]") +
+  xlab("Magnetic Field (nT)") +
+  ylab("Density") +
+  theme_classic()
+```
+```{r}
+# geo coordinates
+ggplot(mfrd2001_g, aes(x=value, color=variable, fill=variable)) + 
+  geom_density(alpha=0.05) +
+  facet_grid(rows = vars(variable)) +
+  ggtitle("Density Plot for Magnetic Field (geographic coordinates) [FRD 2001]") +
+  xlab("Magnetic Field (nT)") +
+  ylab("Density") +
+  theme_classic()
+```
+
+
+
+## acf of hourly and daily data
+
+```{r}
+frd2001 <- read.table("frd2001_samples.csv", sep = ',', header = T)
+nrow(frd2001)
+```
+
+
+```{r}
+# finding the max magnitude value
+max_abs = function(x){
+  x = na.omit(x)
+  if(length(x) == 0) return (0)
+  else{
+    return(x[which.max(abs(x))])  
+  }
+}
+
+# obtaining daily data (using max_abs)
+daily_pooling = function(df, varname, func)
+{
+  y = as.vector(df[, varname])
+  y = matrix(y, ncol = 24, byrow = T)
+  y = apply(y, 1, func) # max pooling
+  return(y)
+}
+```
+
+
+```{r}
+# summarizing into daily data
+daily_dbn <- daily_pooling(frd2001, "dbn_nez", max_abs)
+daily_dbe <- daily_pooling(frd2001, "dbe_nez", max_abs)
+daily_dbz <- daily_pooling(frd2001, "dbz_nez", max_abs)
+```
+
+```{r}
+par(mar=c(3,3,3,0))
+acf_dbn_h <- acf(frd2001$dbn_nez[!is.na(frd2001$dbn_nez)], plot = FALSE)
+plot(acf_dbn_h[1:20], main="Autocorrelation for Hourly Data (north_nez)", ylim=c(-0.1,0.9))
+```
+```{r}
+par(mar=c(3,3,3,0))
+acf_dbn_d <- acf(daily_dbn, plot = FALSE)
+plot(acf_dbn_d[1:20], main = "Autocorrelation for Daily Data (north_nez)", ylim=c(-0.1,0.9))
+```
+
+```{r}
+par(mar=c(3,3,3,0))
+acf_dbe_h <- acf(frd2001$dbe_nez[!is.na(frd2001$dbe_nez)], plot = FALSE)
+plot(acf_dbe_h[1:20], main="Autocorrelation for Hourly Data (east_nez)", ylim=c(-0.1,0.9))
+```
+
+```{r}
+par(mar=c(3,3,3,0))
+acf_dbe_d <- acf(daily_dbe, plot = FALSE)
+plot(acf_dbe_d[1:20], main = "Autocorrelation for Daily Data (east_nez)", ylim=c(-0.1,0.9))
+```
+
+```{r}
+par(mar=c(3,3,3,0))
+acf_dbz_h <- acf(frd2001$dbz_nez[!is.na(frd2001$dbz_nez)], plot = FALSE)
+plot(acf_dbz_h[1:20], main="Autocorrelation for Hourly Data (east_nez)", ylim=c(-0.1,0.9))
+```
+
+
+```{r}
+par(mar=c(3,3,3,0))
+acf_dbz_d <- acf(daily_dbz, plot = FALSE)
+plot(acf_dbz_d[1:20], main = "Autocorrelation for Daily Data (vertical_nez)", ylim=c(-0.1,0.9))
+```
+## Comparing Stations
+
+```{r}
+clk <- read.csv("CLK2001_2.csv")
+msh <- read.csv("MSH2001.csv")
+
+clk <- clk[,c("Date_UTC","dbn_nez","dbn_geo","dbe_nez","dbe_geo","dbz_nez","dbz_geo")]
+frd <- frd[,c("Date_UTC","dbn_nez","dbn_geo","dbe_nez","dbe_geo","dbz_nez","dbz_geo")]
+msh <- msh[,c("Date_UTC","dbn_nez","dbn_geo","dbe_nez","dbe_geo","dbz_nez","dbz_geo")]
+
+clk2 = clk[(1:nrow(clk)-1) %% 60 == 0 ,]
+frd2 = frd
+msh2 = msh[(1:nrow(clk)-1) %% 60 == 0 ,]
+
+# check the number of rows for each data is consistent
+print(nrow(clk2))
+print(nrow(frd2))
+print(nrow(msh2))
+```
+
+```{r}
+# Date
+clk2$Date = ymd(substr(clk2$Date_UTC, 1, 10))
+frd2$Date = ymd(substr(frd2$Date_UTC, 1, 10))
+msh2$Date = ymd(substr(msh2$Date_UTC, 1, 10))
+```
+
+
+```{r}
+# For the presentation
+p1 <- ggplot() +
+  geom_line(data = clk2, aes(x = Date, y = dbn_nez), color = "red") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("CLK 2001 Hourly Data (North)") +
+  theme_bw() +
+  ylim(-1100, 300) +
+  xlab("") + ylab("")
+p2 <- ggplot() +
+  geom_line(data = frd2, aes(x = Date, y = dbn_nez), color = "orange") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("FRD 2001 Hourly Data (North)") +
+  theme_bw() +
+  ylim(-1100, 300) +
+  xlab("") + ylab("")
+p3 <- ggplot() +
+  geom_line(data = msh2, aes(x = Date, y = dbn_nez), color = "darkblue") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("MSH 2001 Hourly Data (North)") +
+  theme_bw() +
+  ylim(-1100, 300) +
+  ylab("")
+
+p1 / p2 / p3
+```
+
+```{r}
+p1 <- ggplot() +
+  geom_line(data = clk2, aes(x = Date, y = dbe_nez), color = "red") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("CLK 2001 Hourly Data (East)") +
+  theme_bw() +
+  ylim(-500, 400) +
+  xlab("") + ylab("dbe_nez (nT)")
+p2 <- ggplot() +
+  geom_line(data = frd2, aes(x = Date, y = dbe_nez), color = "orange") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("FRD 2001 Hourly Data (East)") +
+  theme_bw() +
+  ylim(-500, 400) +
+  xlab("") + ylab("dbe_nez (nT)")
+p3 <- ggplot() +
+  geom_line(data = msh2, aes(x = Date, y = dbe_nez), color = "darkblue") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("MSH 2001 Hourly Data (East)") +
+  theme_bw() +
+  ylim(-500, 400) +
+  ylab("dbe_nez (nT)")
+
+p1 / p2 / p3
+```
+
+```{r}
+p1 <- ggplot() +
+  geom_line(data = clk2, aes(x = Date, y = dbz_nez), color = "red") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("CLK 2001 Hourly Data (Vertical)") +
+  theme_bw() +
+  ylim(-450, 300) +
+  xlab("") + ylab("dbz_nez (nT)")
+p2 <- ggplot() +
+  geom_line(data = frd2, aes(x = Date, y = dbz_nez), color = "orange") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("FRD 2001 Hourly Data (Vertical)") +
+  theme_bw() +
+  ylim(-450, 300) +
+  xlab("") + ylab("dbz_nez (nT)")
+p3 <- ggplot() +
+  geom_line(data = msh2, aes(x = Date, y = dbz_nez), color = "darkblue") +
+  scale_x_date(date_labels = "%b") +
+  ggtitle("MSH 2001 Hourly Data (Vertical)") +
+  theme_bw() +
+  ylim(-450, 300) +
+  ylab("dbz_nez (nT)")
+
+p1 / p2 / p3
+```
+
+## Correlation of same variables from different stations
+
+```{r}
+# for presentation
+par(mar=c(3,3,3,0))
+ggplot(data = data.frame(x = clk2$dbn_nez, y = frd2$dbn_nez), aes(x=x, y=y)) +
+  geom_point() +
+  stat_cor(method = "pearson", label.x = -1000, label.y = 150, size=7) +
+  theme_bw() +
+  ggtitle("The Correlation between north_nez Variables from Different Stations (CLK, FRD)") +
+  xlab("CLK") +
+  ylab("FRD") +
+  theme(plot.title = element_text(face="bold", size=12))
+```
+```{r}
+ggplot(data = data.frame(x = clk2$dbe_nez, y = frd2$dbe_nez), aes(x=x, y=y)) +
+  geom_point() +
+  stat_cor(method = "pearson", label.x = -900, label.y = 100) +
+  theme_bw() +
+  ggtitle("The Correlation between dbe_nez Variables from Different Stations (CLK, FRD)") +
+  xlab("dbe_nez from CLK") +
+  ylab("dbe_nez from FRD")
+```
+
+
+```{r}
+ggplot(data = data.frame(x = clk2$dbz_nez, y = frd2$dbz_nez), aes(x=x, y=y)) +
+  geom_point() +
+  stat_cor(method = "pearson", label.x = -900, label.y = 150) +
+  theme_bw() +
+  ggtitle("The Correlation between dbz_nez Variables from Different Stations (CLK, FRD)") +
+  xlab("dbz_nez from CLK") +
+  ylab("dbz_nez from FRD")
+```
+
+
+
+
+
+
+
